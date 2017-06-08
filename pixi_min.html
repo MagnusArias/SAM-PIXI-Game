@@ -1,0 +1,307 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Multiplayer Game</title>
+</head>
+<body>
+<!-- Include latest version of PIXI.js from the web -->
+<!-- <script src="https://pixijs.download/release/pixi.min.js"></script> -->
+<!-- Include PIXI localy (v4.5.1) -->
+<script src="pixi.js/pixi.min.js"></script>
+<script>
+
+    var rAFID;
+    var playerArray = new Array()
+    var projectilesArray = new Array();
+    var scoreArray = new Array();
+    var scoreDisplayMessages = new Array();
+
+    var websocket;
+    //var wsUrl = "ws://217.113.238.211:8080/EchoChamber/echo";
+    wsUrl = "ws://localhost:8080/EchoChamber/echo";
+    var degreesPerSecond = 30;
+    var previousTime = 0;
+    var gameStarted = false;
+    var protocol = {
+        START: "0",
+        GAME: "1",
+        END: "2"
+    };
+
+    var gameStarted = false;
+    var whichPlayerAmI = 0;
+
+
+    var playerMoveLeft, playerMoveRight, playerMoveUp, playerMoveDown;
+
+    var app
+
+    function init() {
+
+        app = new PIXI.Application(800, 600, {backgroundColor: 0x1099bb});
+        document.body.appendChild(app.renderer.view);
+
+        websocket = new WebSocket(wsUrl);
+        websocket.addEventListener("open", onOpen, false);
+        websocket.addEventListener("close", onClose, false);
+        websocket.addEventListener("message", onMessage, false);
+        websocket.addEventListener("error", onError, false);
+
+        setUpScores();
+        setUpKeyboard();
+        setUpSprites();
+
+
+        rAFID = requestAnimationFrame(GameLoop)
+
+    }
+
+    function onOpen(evt) {
+        writeToConsole("CONNECTED");
+        doSend(protocol.START + ":0");
+        writeToConsole("Send START packet");
+    }
+
+    function onClose(evt) {
+        writeToConsole("DISCONNECTED");
+    }
+
+
+    function onError(evt) {
+        writeToConsole(evt.data);
+        clearInterval(inter);
+    }
+
+    function GameLoop(timestamp) {
+
+        var nowTime = window.performance.now();
+        var delta = nowTime - previousTime;
+
+
+        updateCollisions();
+
+        var radiansPerSecond = degreesPerSecond * 3.1415 / 180;
+        for (i = 0; i < 4; i++) {
+            playerArray[i].rotation += (radiansPerSecond * (delta / 1000) );
+
+            playerArray[i].x += playerArray[i].vx;
+            playerArray[i].y += playerArray[i].vy;
+
+            scoreArray[i] = Math.round(playerArray[i].rotation);
+        }
+
+
+        updateScores();
+        if (gameStarted) {
+            doSend(protocol.GAME + ":" +
+                whichPlayerAmI + ":" +
+                playerArray[whichPlayerAmI].x + ":" +
+                playerArray[whichPlayerAmI].y + ":" +
+                playerArray[whichPlayerAmI].rotation);
+        }
+        requestAnimationFrame(GameLoop);
+        previousTime = window.performance.now();
+    }
+
+    function doSend(message) {
+        websocket.send(message);
+    }
+
+    function onMessage(evt) {
+        writeToConsole("onMessage: " + evt.data);
+        var split = evt.data.split(":");
+        switch (split[0]) {
+            case "0":
+                whichPlayerAmI = parseInt(split[1]);
+                playerArray[whichPlayerAmI].x = parseInt(split[2]);
+                playerArray[whichPlayerAmI].y = parseInt(split[3]);
+                playerArray[whichPlayerAmI].rotation = parseInt(split[4]);
+                writeToConsole("Imma playr = " + whichPlayerAmI.toString());
+                writeToConsole(whichPlayerAmI.toString() + ":" + playerArray[whichPlayerAmI].x + ":" + playerArray[whichPlayerAmI].y + ":" + playerArray[whichPlayerAmI].rotation);
+                break;
+
+
+            case "1":
+                gameStarted = true;
+
+                var player = parseInt(split[1]);
+
+                if (player != whichPlayerAmI) {
+                    playerArray[player].x = parseInt(split[2]);
+                    playerArray[player].y = parseInt(split[3]);
+                    //playerArray[player].rotation = parseInt(split[4]);
+                }
+        }
+    }
+
+    function writeToConsole(message) {
+        console.log(message);
+    }
+
+    //run the function only after the whole page has been loaded
+    window.addEventListener("load", init, false);
+
+
+    function setUpScores() {
+        for (i = 0; i < 4; i++) {
+            scoreArray[i] = 0;
+            scoreDisplayMessages[i] = new PIXI.Text("P" + i + ": " + scoreArray[i],
+                {fontFamily: "Arial", fontSize: 32, fill: "white"});
+            scoreDisplayMessages[i].position.set((i * (0.25) * app.renderer.width), 0);
+            app.stage.addChild(scoreDisplayMessages[i]);
+
+        }
+
+
+    }
+
+
+    function setUpSprites() {
+        // create a new Sprite from an image path
+        playerArray.push(PIXI.Sprite.fromImage('explorer.png'));
+        playerArray.push(PIXI.Sprite.fromImage('Wizard_Base.png'));
+        playerArray.push(PIXI.Sprite.fromImage('Rogue_Base.png'));
+        playerArray.push(PIXI.Sprite.fromImage('Templar_Base.png'));
+
+        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
+        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
+        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
+        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
+
+
+        // 4 players and 4 bullets - simplification
+        for (i = 0; i < 4; i++) {
+            app.stage.addChild(playerArray[i]);
+            playerArray[i].anchor.set(0.5);
+            playerArray[i].scale.set(2, 2);
+            playerArray[i].vx = 0;
+            playerArray[i].vy = 0;
+
+            projectilesArray[i].anchor.set(0.5);
+            projectilesArray[i].scale.set(2, 2);
+            projectilesArray[i].vx = 0;
+            projectilesArray[i].vy = 0;
+            projectilesArray[i].x = -100;
+            projectilesArray[i].y = -100;
+        }
+
+        playerArray[0].x = app.renderer.width / 4;
+        playerArray[0].y = app.renderer.height / 4;
+
+        playerArray[1].x = app.renderer.width * 3 / 4;
+        playerArray[1].y = app.renderer.height / 4;
+
+        playerArray[2].x = app.renderer.width / 4;
+        playerArray[2].y = app.renderer.height * 3 / 4;
+
+        playerArray[3].x = app.renderer.width * 3 / 4;
+        playerArray[3].y = app.renderer.height * 3 / 4;
+    }
+
+    function setUpKeyboard() {
+        playerMoveLeft = keyboard(65);
+        playerMoveRight = keyboard(68);
+        playerMoveUp = keyboard(87);
+        playerMoveDown = keyboard(83);
+
+        //Right
+        playerMoveRight.press = function () {
+            playerArray[whichPlayerAmI].vx = 5;
+            playerArray[whichPlayerAmI].vy = 0;
+        };
+        playerMoveRight.release = function () {
+            if (!playerMoveLeft.isDown && playerArray[whichPlayerAmI].vy === 0) {
+                playerArray[whichPlayerAmI].vx = 0;
+            }
+        };
+
+        //Left arrow key `press` method
+        playerMoveLeft.press = function () {
+            playerArray[whichPlayerAmI].vx = -5;
+            playerArray[whichPlayerAmI].vy = 0;
+        };
+
+        //Left arrow key `release` method
+        playerMoveLeft.release = function () {
+            if (!playerMoveRight.isDown && playerArray[whichPlayerAmI].vy === 0) {
+                playerArray[whichPlayerAmI].vx = 0;
+            }
+        };
+
+        //Up
+        playerMoveUp.press = function () {
+            playerArray[whichPlayerAmI].vy = -5;
+            playerArray[whichPlayerAmI].vx = 0;
+        };
+        playerMoveUp.release = function () {
+            if (!playerMoveDown.isDown && playerArray[whichPlayerAmI].vx === 0) {
+                playerArray[whichPlayerAmI].vy = 0;
+            }
+        };
+
+        //Down
+        playerMoveDown.press = function () {
+            playerArray[whichPlayerAmI].vy = 5;
+            playerArray[whichPlayerAmI].vx = 0;
+        };
+        playerMoveDown.release = function () {
+            if (!playerMoveUp.isDown && playerArray[whichPlayerAmI].vx === 0) {
+                playerArray[whichPlayerAmI].vy = 0;
+            }
+        };
+    }
+
+
+    function keyboard(keyCode) {
+        var key = {};
+        key.code = keyCode;
+        key.isDown = false;
+        key.isUp = true;
+        key.press = undefined;
+        key.release = undefined;
+        //The `downHandler`
+        key.downHandler = function (event) {
+            if (event.keyCode === key.code) {
+                if (key.isUp && key.press) key.press();
+                key.isDown = true;
+                key.isUp = false;
+            }
+            event.preventDefault();
+        };
+
+        //The `upHandler`
+        key.upHandler = function (event) {
+            if (event.keyCode === key.code) {
+                if (key.isDown && key.release) key.release();
+                key.isDown = false;
+                key.isUp = true;
+            }
+            event.preventDefault();
+        };
+
+        //Attach event listeners
+        window.addEventListener(
+            "keydown", key.downHandler.bind(key), false
+        );
+        window.addEventListener(
+            "keyup", key.upHandler.bind(key), false
+        );
+        return key;
+    }
+
+
+    function updateScores() {
+        //TODO: CHANGE IMPLEMENTATION
+        for (i = 0; i < 4; i++) {
+            scoreDisplayMessages[i].text = "P" + i + ": " + scoreArray[i];
+        }
+    }
+
+    function updateCollisions() {
+        //UPDATING COLLISIONS - TODO
+    }
+
+</script>
+</body>
+</html>
