@@ -38,8 +38,10 @@
     var gameStarted = false;
     var whichPlayerAmI = 0;
 
-
+    var canShoot = true;
     var playerMoveLeft, playerMoveRight, playerMoveUp, playerMoveDown;
+    var projectileShootLeft, projectileShootRight, projectileShootUp, projectileShootDown;
+
 
     var app;
 
@@ -220,6 +222,35 @@
         playerMoveUp = keyboard(87);
         playerMoveDown = keyboard(83);
 
+        projectileShootLeft = keyboard(74);
+        projectileShootRight = keyboard(76);
+        projectileShootUp = keyboard(73);
+        projectileShootDown = keyboard(75);
+
+        //shooting projectiles
+        projectileShootLeft.press = function()
+        {
+            shootProjectile('left');
+        }
+
+        projectileShootRight.press = function()
+        {
+            shootProjectile('right');
+
+        }
+
+        projectileShootUp.press = function()
+        {
+            shootProjectile('up');
+        }
+
+        projectileShootDown.press = function()
+        {
+            shootProjectile('down');
+
+        }
+
+
         //Right
         playerMoveRight.press = function () {
             playerArray[whichPlayerAmI].vx = 5;
@@ -267,6 +298,62 @@
         };
     }
 
+    function updatePositions()
+    {
+        for(i=0; i< playerArray.length; i++)
+        {
+
+            var player = playerArray[i];
+            player.x += player.vx;
+            player.y += player.vy;
+
+        }
+
+        for (i = 0; i < projectilesArray.length; i++ )
+        {
+            var projectile = projectilesArray[i];
+            projectile.x +=projectile.vx;
+            projectile.y +=projectile.vy;
+        }
+    }
+
+    function shootProjectile(direction)
+    {
+        if (!canShoot) return;
+        else canShoot = false;
+
+        var projectileSpeed = 10;
+        var projectile = projectilesArray[whichPlayerAmI];
+        var player = playerArray[whichPlayerAmI];
+
+        projectile.x = player.x + player.width/2 -projectile.width/2;
+        projectile.y = player.y + player.height/2 -projectile.height / 2;
+        projectile.vx = 0;
+        projectile.vy = 0;
+
+        switch (direction) {
+            case 'left':
+                projectile.vx = -projectileSpeed;
+                break;
+
+            case 'right':
+                projectile.vx = projectileSpeed;
+
+                break;
+
+            case 'up':
+                projectile.vy = -projectileSpeed;
+                break;
+
+            case 'down':
+                projectile.vy = projectileSpeed;
+                break;
+
+            default:
+                break;
+        }
+
+    }
 
     function keyboard(keyCode) {
         var key = {};
@@ -316,6 +403,9 @@
     function updateCollisions() {
         // check out of bounds for player
         var player = playerArray[whichPlayerAmI];
+        var projectile =projectilesArray[whichPlayerAmI];
+        var resetProjectile = false;
+
 
         if (player.x < 0 ) {player.vx = 0; player.x = 0;}
         if (player.y < 0) {player.vy = 0; player.y = 0;}
