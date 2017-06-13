@@ -41,7 +41,7 @@
 
     var playerMoveLeft, playerMoveRight, playerMoveUp, playerMoveDown;
 
-    var app
+    var app;
 
     function init() {
 
@@ -118,16 +118,16 @@
         var split = evt.data.split(";");
         switch (split[0]) {
             case "0":
-                whichPlayerAmI = parseInt(split[1]);
-                playerArray[whichPlayerAmI].x = parseInt(split[2]);
-                playerArray[whichPlayerAmI].y = parseInt(split[3]);
-                writeToConsole("Imma playr = " + whichPlayerAmI.toString());
+                if (split[1] != ""){
+                    whichPlayerAmI = parseInt(split[1]);
+                    writeToConsole("Imma playr = " + whichPlayerAmI.toString());
+                }
+                else gameStarted = true;
                // writeToConsole(whichPlayerAmI.toString() + ":" + playerArray[whichPlayerAmI].x + ":" + playerArray[whichPlayerAmI].y + ":" + playerArray[whichPlayerAmI].rotation);
                 break;
 
 
             case "1":
-                gameStarted = true;
 
                 var player = parseInt(split[1]);
 
