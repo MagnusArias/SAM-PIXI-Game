@@ -29,13 +29,13 @@
     var degreesPerSecond = 30;
     var previousTime = 0;
     var gameStarted = false;
+
     var protocol = {
         START: "0",
         GAME: "1",
         END: "2"
     };
 
-    var gameStarted = false;
     var whichPlayerAmI = 0;
 
     var canShoot = true;
@@ -88,25 +88,16 @@
 
 
         updateCollisions();
-
-        var radiansPerSecond = degreesPerSecond * 3.1415 / 180;
-        for (i = 0; i < 4; i++) {
-           // playerArray[i].rotation += (radiansPerSecond * (delta / 1000) );
-
-            playerArray[i].x += playerArray[i].vx;
-            playerArray[i].y += playerArray[i].vy;
-
-           // scoreArray[i] = Math.round(playerArray[i].rotation);
-        }
-
-
+        updatePositions();
         updateScores();
+
         if (gameStarted) {
             doSend(protocol.GAME + ";" +
                 whichPlayerAmI + ";" +
                 playerArray[whichPlayerAmI].x + ";" +
                 playerArray[whichPlayerAmI].y);
         }
+
         requestAnimationFrame(GameLoop);
         previousTime = window.performance.now();
     }
@@ -162,46 +153,51 @@
     }
 
 
-    function setUpSprites() {
+    function setUpSprites()
+    {
         // create a new Sprite from an image path
-        playerArray.push (PIXI.Sprite.fromImage('MGS_1.png' ));
-        playerArray.push (PIXI.Sprite.fromImage('MGS_2.png'));
-        playerArray.push (PIXI.Sprite.fromImage('MGS_3.png'));
-        playerArray.push (PIXI.Sprite.fromImage('MGS_4.png'));
+        playerArray.push (PIXI.Sprite.fromImage('assets/MGS_1.png' ));
+        playerArray.push (PIXI.Sprite.fromImage('assets/MGS_2.png'));
+        playerArray.push (PIXI.Sprite.fromImage('assets/MGS_3.png'));
+        playerArray.push (PIXI.Sprite.fromImage('assets/MGS_4.png'));
 
+        projectilesArray.push(PIXI.Sprite.fromImage('assets/projectile.png'));
+        projectilesArray.push(PIXI.Sprite.fromImage('assets/projectile.png'));
+        projectilesArray.push(PIXI.Sprite.fromImage('assets/projectile.png'));
+        projectilesArray.push(PIXI.Sprite.fromImage('assets/projectile.png'));
 
-        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
-        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
-        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
-        projectilesArray.push(PIXI.Sprite.fromImage('projectile.png'));
+        wallArray.push(PIXI.Sprite.fromImage('assets/wall.jpg'));
+        wallArray.push(PIXI.Sprite.fromImage('assets/wall.jpg'));
+        wallArray.push(PIXI.Sprite.fromImage('assets/wall.jpg'));
+        wallArray.push(PIXI.Sprite.fromImage('assets/wall.jpg'));
 
-        wallArray.push(PIXI.Sprite.fromImage('wall.jpg'));
-        wallArray.push(PIXI.Sprite.fromImage('wall.jpg'));
-        wallArray.push(PIXI.Sprite.fromImage('wall.jpg'));
-        wallArray.push(PIXI.Sprite.fromImage('wall.jpg'));
-
-        for (i = 0; i< wallArray.length; i++) {
+        for (i = 0; i< wallArray.length; i++)
+        {
             app.stage.addChild(wallArray[i]);
             console.log(i + "  " + playerArray[i].width);
-            wallArray[i].x = app.renderer.width / 4 * i + (app.renderer.width / 4 - 64);
-            wallArray[i].y = app.renderer.height / 4 * i + (app.renderer.height / 4 - 64);
+            wallArray[i].x = app.renderer.width/4 * i + (app.renderer.width/4 - 64); //TODO: remove magic number (64) - placeholder, PIXI.loader does not work properly right now
+            wallArray[i].y = app.renderer.height/4 * i  +(app.renderer.height/4 - 64); //TODO: remove magic number (64) - placeholder, PIXI.loader does not work properly right now
         }
 
+
         // 4 players and 4 bullets - simplification
-        for (i = 0; i < 4; i++) {
+        for ( i=0; i<4; i++)
+        {
             app.stage.addChild(playerArray[i]);
             //playerArray[i].anchor.set(0.5);
-            //playerArray[i].scale.set(2, 2);
+            //playerArray[i].scale.set(2,2);
             playerArray[i].vx = 0;
             playerArray[i].vy = 0;
 
             //projectilesArray[i].anchor.set(0.5);
-            //projectilesArray[i].scale.set(2, 2);
+            //projectilesArray[i].scale.set(2,2);
+            app.stage.addChild(projectilesArray[i]);
             projectilesArray[i].vx = 0;
             projectilesArray[i].vy = 0;
             projectilesArray[i].x = -100;
             projectilesArray[i].y = -100;
         }
+
 
         playerArray[0].x = app.renderer.width / 4;
         playerArray[0].y = app.renderer.height / 4;
@@ -216,7 +212,8 @@
         playerArray[3].y = app.renderer.height * 3 / 4;
     }
 
-    function setUpKeyboard() {
+    function setUpKeyboard()
+    {
         playerMoveLeft = keyboard(65);
         playerMoveRight = keyboard(68);
         playerMoveUp = keyboard(87);
@@ -252,50 +249,61 @@
 
 
         //Right
-        playerMoveRight.press = function () {
-            playerArray[whichPlayerAmI].vx = 5;
-            playerArray[whichPlayerAmI].vy = 0;
+        playerMoveRight.press = function()
+        {
+            if(playerArray[whichPlayerAmI].x < app.renderer.width - playerArray[whichPlayerAmI].width )
+            {
+                playerArray[whichPlayerAmI].vx = 5;
+                playerArray[whichPlayerAmI].vy = 0;
+            }
+
         };
-        playerMoveRight.release = function () {
-            if (!playerMoveLeft.isDown && playerArray[whichPlayerAmI].vy === 0) {
+        playerMoveRight.release = function() {
+            if (!playerMoveLeft.isDown &&  playerArray[whichPlayerAmI].vy === 0) {
                 playerArray[whichPlayerAmI].vx = 0;
             }
         };
 
-        //Left arrow key `press` method
-        playerMoveLeft.press = function () {
-            playerArray[whichPlayerAmI].vx = -5;
-            playerArray[whichPlayerAmI].vy = 0;
+        //Left
+        playerMoveLeft.press = function() {
+
+            if(playerArray[whichPlayerAmI].x > 0)
+            {
+                playerArray[whichPlayerAmI].vx = -5;
+                playerArray[whichPlayerAmI].vy = 0;
+            }
+
         };
 
-        //Left arrow key `release` method
-        playerMoveLeft.release = function () {
-            if (!playerMoveRight.isDown && playerArray[whichPlayerAmI].vy === 0) {
+        //Left
+        playerMoveLeft.release = function() {
+            if (!playerMoveRight.isDown &&  playerArray[whichPlayerAmI].vy === 0) {
                 playerArray[whichPlayerAmI].vx = 0;
             }
         };
 
         //Up
-        playerMoveUp.press = function () {
+        playerMoveUp.press = function() {
             playerArray[whichPlayerAmI].vy = -5;
             playerArray[whichPlayerAmI].vx = 0;
         };
-        playerMoveUp.release = function () {
+        playerMoveUp.release = function() {
             if (!playerMoveDown.isDown && playerArray[whichPlayerAmI].vx === 0) {
                 playerArray[whichPlayerAmI].vy = 0;
             }
         };
 
         //Down
-        playerMoveDown.press = function () {
+        playerMoveDown.press = function() {
             playerArray[whichPlayerAmI].vy = 5;
             playerArray[whichPlayerAmI].vx = 0;
         };
-        playerMoveDown.release = function () {
+        playerMoveDown.release = function() {
             if (!playerMoveUp.isDown && playerArray[whichPlayerAmI].vx === 0) {
                 playerArray[whichPlayerAmI].vy = 0;
             }
         };
+
     }
 
     function updatePositions()
@@ -338,7 +346,6 @@
 
             case 'right':
                 projectile.vx = projectileSpeed;
-
                 break;
 
             case 'up':
@@ -403,7 +410,7 @@
     function updateCollisions() {
         // check out of bounds for player
         var player = playerArray[whichPlayerAmI];
-        var projectile =projectilesArray[whichPlayerAmI];
+        var projectile = projectilesArray[whichPlayerAmI];
         var resetProjectile = false;
 
 
