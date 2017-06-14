@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html>
 <head>
@@ -17,24 +18,25 @@
     var scoreArray = new Array();
     var scoreDisplayMessages = new Array();
     var wallArray = new Array();
-
     //TODO: Player classes (specializations (soldier, gunner, runner, zombie))
     var playerClassesArray = new Array()
 
-
-
     var websocket;
+    //var wsUrl = "ws://0.tcp.ngrok.io:13272/WebSocketServer/echo";
+    //var wsUrl = "ws://localhost:8080/WebSocketServer/echo";
     var wsUrl = "ws://217.113.238.211:8080/EchoChamber/echo";
-    //wsUrl = "ws://localhost:8080/EchoChamber/echo";
-    var degreesPerSecond = 30;
-    var previousTime = 0;
-    var gameStarted = false;
 
+    var gameStarted = false;
     var protocol = {
-        START: "0",
-        GAME: "1",
-        END: "2"
+        START : "0",
+        MOVE : "1",
+        HIT : "2",
+        POINT : "3",
+        END : "4"
     };
+    var playerHMode;
+
+    var previousTime = 0;
 
     var whichPlayerAmI = 0;
 
@@ -42,43 +44,121 @@
     var playerMoveLeft, playerMoveRight, playerMoveUp, playerMoveDown;
     var projectileShootLeft, projectileShootRight, projectileShootUp, projectileShootDown;
 
-
     var app;
 
-    function init() {
+    function init()
+    {
 
-        app = new PIXI.Application(800, 600, {backgroundColor: 0x1099bb});
+        app = new PIXI.Application(800, 600, {backgroundColor : 0x1099bb});
         document.body.appendChild(app.renderer.view);
 
-        websocket = new WebSocket(wsUrl);
-        websocket.addEventListener("open", onOpen, false);
-        websocket.addEventListener("close", onClose, false);
-        websocket.addEventListener("message", onMessage, false);
-        websocket.addEventListener("error", onError, false);
+        initConnection();
 
         setUpScores();
         setUpKeyboard();
         setUpSprites();
 
 
+
         rAFID = requestAnimationFrame(GameLoop)
 
     }
 
-    function onOpen(evt) {
-        writeToConsole("CONNECTED");
-        doSend(protocol.START + ";0");
-        writeToConsole("Send START packet");
+    function initConnection() {
+        websocket = new WebSocket(wsUrl);
+
+        websocket.addEventListener("open", onOpen, false);
+        websocket.addEventListener("close", onClose, false);
+        websocket.addEventListener("message", onMessage, false);
+        websocket.addEventListener("error", onError, false);
     }
 
-    function onClose(evt) {
+    function onOpen(evt)
+    {
+        writeToConsole("CONNECTED");
+        doSend(protocol.START);
+    }
+
+    function onClose(evt)
+    {
         writeToConsole("DISCONNECTED");
     }
 
+    function onMessage(evt)
+    {
+        var split = evt.data.split(";");
+        if(split[0] == "2") {
+            writeToConsole("onMessage: " + evt.data);
+        }
+        switch(split[0]) {
+            case "0":
+                if(split[1]) {
+                    whichPlayerAmI = split[1];
+                } else {
+                    gameStarted = true;
+                    writeToConsole("start gry!");
+                }
+                break;
+            case "1":
+                if(gameStarted) {
+                    if(split[1] !== whichPlayerAmI) {
+                        var index = parseInt(split[1]);
+                        playerArray[index].x = parseInt(split[2]);
+                        playerArray[index].y = parseInt(split[3]);
+                    }
+                }
+                break;
+            case "2":
+                if(gameStarted) {
+                    if(split[1] !== whichPlayerAmI) {
+                        var index = parseInt(split[1]);
+                        projectilesArray[index].x = parseInt(split[2]);
+                        projectilesArray[index].y = parseInt(split[3]);
+                    }
+                }
+                break;
+            case "3":
+                if(gameStarted) {
+                    if(split[1] !== whichPlayerAmI) {
+                        var index = parseInt(split[1]);
+                        scoreArray[index]++;
+                    }
+                }
+                break;
+            case "4":
+                gameStarted = false;
+                break;
+        }
+    }
 
-    function onError(evt) {
+    function onError(evt)
+    {
         writeToConsole(evt.data);
-        clearInterval(inter);
+    }
+
+    //Sent something to websocket server
+    function doSend(message)
+    {
+        writeToConsole("onSend: " + message);
+        websocket.send(message);
+    }
+
+    function sendPosition() {
+        var request = protocol.MOVE + ";" + whichPlayerAmI + ";" + playerArray[whichPlayerAmI].x + ";" + playerArray[whichPlayerAmI].y;
+
+        doSend(request);
+
+        //if(!canShoot) {
+        var hitrequest = protocol.HIT + ";" + whichPlayerAmI + ";" + projectilesArray[whichPlayerAmI].x + ";" + projectilesArray[whichPlayerAmI].y;
+
+        doSend(hitrequest);
+        //}
+    }
+
+    //Write the message to the console
+    function writeToConsole(message)
+    {
+        console.log(message);
     }
 
     function GameLoop(timestamp) {
@@ -89,64 +169,32 @@
 
         updateCollisions();
         updatePositions();
+
+        if(gameStarted) {
+            sendPosition();
+        }
+
         updateScores();
 
-        if (gameStarted) {
-            doSend(protocol.GAME + ";" +
-                whichPlayerAmI + ";" +
-                playerArray[whichPlayerAmI].x + ";" +
-                playerArray[whichPlayerAmI].y);
-        }
 
         requestAnimationFrame(GameLoop);
         previousTime = window.performance.now();
     }
 
-    function doSend(message) {
-        websocket.send(message);
-    }
-
-    function onMessage(evt) {
-        writeToConsole("onMessage: " + evt.data);
-        var split = evt.data.split(";");
-        switch (split[0]) {
-            case "0":
-                if (split[1] != ""){
-                    whichPlayerAmI = parseInt(split[1]);
-                    writeToConsole("Imma playr = " + whichPlayerAmI.toString());
-                }
-                else gameStarted = true;
-               // writeToConsole(whichPlayerAmI.toString() + ":" + playerArray[whichPlayerAmI].x + ":" + playerArray[whichPlayerAmI].y + ":" + playerArray[whichPlayerAmI].rotation);
-                break;
-
-
-            case "1":
-
-                var player = parseInt(split[1]);
-
-                if (player != whichPlayerAmI) {
-                    playerArray[player].x = parseInt(split[2]);
-                    playerArray[player].y = parseInt(split[3]);
-                }
-        }
-    }
-
-    function writeToConsole(message) {
-        console.log(message);
-    }
 
     //run the function only after the whole page has been loaded
     window.addEventListener("load", init, false);
 
 
-    function setUpScores() {
-        for (i = 0; i < 4; i++) {
+    function setUpScores()
+    {
+        for( i=0; i< 4; i++)
+        {
             scoreArray[i] = 0;
             scoreDisplayMessages[i] = new PIXI.Text("P" + i + ": " + scoreArray[i],
                 {fontFamily: "Arial", fontSize: 32, fill: "white"});
-            scoreDisplayMessages[i].position.set((i * (0.25) * app.renderer.width), 0);
+            scoreDisplayMessages[i].position.set((i* (0.25) * app.renderer.width),0 );
             app.stage.addChild(scoreDisplayMessages[i]);
-
         }
 
 
@@ -180,40 +228,38 @@
         }
 
 
+
         // 4 players and 4 bullets - simplification
         for ( i=0; i<4; i++)
         {
             app.stage.addChild(playerArray[i]);
-            //playerArray[i].anchor.set(0.5);
-            //playerArray[i].scale.set(2,2);
             playerArray[i].vx = 0;
             playerArray[i].vy = 0;
 
-            //projectilesArray[i].anchor.set(0.5);
-            //projectilesArray[i].scale.set(2,2);
             app.stage.addChild(projectilesArray[i]);
             projectilesArray[i].vx = 0;
             projectilesArray[i].vy = 0;
             projectilesArray[i].x = -100;
             projectilesArray[i].y = -100;
+
+
         }
 
 
         playerArray[0].x = app.renderer.width / 4;
         playerArray[0].y = app.renderer.height / 4;
 
-        playerArray[1].x = app.renderer.width * 3 / 4;
+        playerArray[1].x = app.renderer.width * 3/4;
         playerArray[1].y = app.renderer.height / 4;
 
         playerArray[2].x = app.renderer.width / 4;
-        playerArray[2].y = app.renderer.height * 3 / 4;
+        playerArray[2].y = app.renderer.height * 3/4;
 
-        playerArray[3].x = app.renderer.width * 3 / 4;
-        playerArray[3].y = app.renderer.height * 3 / 4;
+        playerArray[3].x = app.renderer.width * 3/4;
+        playerArray[3].y = app.renderer.height * 3/4;
     }
 
-    function setUpKeyboard()
-    {
+    function setUpKeyboard() {
         playerMoveLeft = keyboard(65);
         playerMoveRight = keyboard(68);
         playerMoveUp = keyboard(87);
@@ -224,7 +270,13 @@
         projectileShootUp = keyboard(73);
         projectileShootDown = keyboard(75);
 
-        //shooting projectiles
+       /* playerHMode = keyboard(72);
+
+        playerHMode.press = function() {
+            //doSend(protocol.POINT);
+        };*/
+
+
         projectileShootLeft.press = function()
         {
             shootProjectile('left');
@@ -233,7 +285,6 @@
         projectileShootRight.press = function()
         {
             shootProjectile('right');
-
         }
 
         projectileShootUp.press = function()
@@ -244,9 +295,7 @@
         projectileShootDown.press = function()
         {
             shootProjectile('down');
-
         }
-
 
         //Right
         playerMoveRight.press = function()
@@ -256,7 +305,6 @@
                 playerArray[whichPlayerAmI].vx = 5;
                 playerArray[whichPlayerAmI].vy = 0;
             }
-
         };
         playerMoveRight.release = function() {
             if (!playerMoveLeft.isDown &&  playerArray[whichPlayerAmI].vy === 0) {
@@ -303,7 +351,6 @@
                 playerArray[whichPlayerAmI].vy = 0;
             }
         };
-
     }
 
     function updatePositions()
@@ -324,6 +371,7 @@
             projectile.y +=projectile.vy;
         }
     }
+
 
     function shootProjectile(direction)
     {
@@ -346,6 +394,7 @@
 
             case 'right':
                 projectile.vx = projectileSpeed;
+
                 break;
 
             case 'up':
@@ -362,7 +411,8 @@
 
     }
 
-    function keyboard(keyCode) {
+    function keyboard(keyCode)
+    {
         var key = {};
         key.code = keyCode;
         key.isDown = false;
@@ -370,7 +420,7 @@
         key.press = undefined;
         key.release = undefined;
         //The `downHandler`
-        key.downHandler = function (event) {
+        key.downHandler = function(event) {
             if (event.keyCode === key.code) {
                 if (key.isUp && key.press) key.press();
                 key.isDown = true;
@@ -380,7 +430,7 @@
         };
 
         //The `upHandler`
-        key.upHandler = function (event) {
+        key.upHandler = function(event) {
             if (event.keyCode === key.code) {
                 if (key.isDown && key.release) key.release();
                 key.isDown = false;
@@ -400,19 +450,21 @@
     }
 
 
-    function updateScores() {
+    function updateScores()
+    {
         //TODO: CHANGE IMPLEMENTATION
-        for (i = 0; i < 4; i++) {
+        for( i=0; i< 4; i++)
+        {
             scoreDisplayMessages[i].text = "P" + i + ": " + scoreArray[i];
         }
     }
 
-    function updateCollisions() {
+    function updateCollisions()
+    {
         // check out of bounds for player
         var player = playerArray[whichPlayerAmI];
-        var projectile = projectilesArray[whichPlayerAmI];
+        var projectile =projectilesArray[whichPlayerAmI];
         var resetProjectile = false;
-
 
         if (player.x < 0 ) {player.vx = 0; player.x = 0;}
         if (player.y < 0) {player.vy = 0; player.y = 0;}
@@ -451,7 +503,60 @@
             }
         }
 
+
+        //check projectile out of bounds
+        if( (projectile.x + projectile.width) < 0 ||  (projectile.y + projectile.height) < 0 ||
+            projectile.x > app.renderer.width || projectile.y > app.renderer.height )
+        {
+            resetProjectile =true;
+        }
+
+        //check projectile collisions with walls
+
+        for(i = 0; i< wallArray.length; i++)
+        {
+            if(hitTestRectangle(projectile, wallArray[i]))
+            {
+                resetProjectile = true;
+            }
+        }
+
+        //check projectile collisions with players
+        for(i =0; i < playerArray.length; i++ )
+        {
+            if (hitTestRectangle(projectile, playerArray[i]))
+            {
+                if (!(i == whichPlayerAmI))
+                {
+                    if(gameStarted) {
+                        scoreArray[whichPlayerAmI] ++;
+                        resetProjectile = true;
+
+                        doSend(protocol.POINT + ";" + whichPlayerAmI);
+                    }
+
+                    if(gameStarted && scoreArray[whichPlayerAmI] >= 20) {	//10
+                        doSend(protocol.END);
+                    }
+                }
+
+            }
+        }
+
+        if(resetProjectile)
+        {
+            projectile.vx = 0;
+            projectile.vy = 0;
+
+            projectile.x = -100;
+            projectile.y = -100;
+
+            canShoot = true;
+        }
+
+
     }
+
 
     function hitTestRectangle(r1, r2) {
 
@@ -503,7 +608,6 @@
         //`hit` will be either `true` or `false`
         return hit;
     };
-
 
 </script>
 </body>
